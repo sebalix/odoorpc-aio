@@ -19,28 +19,14 @@ def decode_data(data):
     return io.StringIO(data.decode('utf-8'))
 
 
-async def ProxyJSON(host, port, timeout=120, ssl=False,
-                    deserialize=True, client_session=None):
-    proxy = ProxyJSONAIO(host, port, timeout, ssl, deserialize)
-    await proxy._init(client_session)
-    return proxy
-
-
-async def ProxyHTTP(host, port, timeout=120, ssl=False, client_session=None):
-    proxy = ProxyHTTPAIO(host, port, timeout, ssl)
-    await proxy._init(client_session)
-    return proxy
-
-
 class Proxy(object):
     """Base class to implement a proxy to perform requests."""
-    def __init__(self, host, port, timeout=120, ssl=False):
+    def __init__(self, host, port, timeout=120, ssl=False,
+                 client_session=None):
         self._root_url = "{http}{host}:{port}".format(
             http=(ssl and "https://" or "http://"), host=host, port=port)
         self._timeout = timeout
         self._builder = URLBuilder(self)
-
-    async def _init(self, client_session):
         if client_session is None:
             client_session = aiohttp.ClientSession()
         self._client_session = client_session
@@ -52,12 +38,13 @@ class Proxy(object):
         return self._builder[url]
 
 
-class ProxyJSONAIO(Proxy):
-    """The :class:`ProxyJSONAIO` class provides a dynamic access
+class ProxyJSON(Proxy):
+    """The :class:`ProxyJSON` class provides a dynamic access
     to all JSON methods.
     """
-    def __init__(self, host, port, timeout=120, ssl=False, deserialize=True):
-        Proxy.__init__(self, host, port, timeout, ssl)
+    def __init__(self, host, port, timeout=120, ssl=False, deserialize=True,
+                 client_session=None):
+        Proxy.__init__(self, host, port, timeout, ssl, client_session)
         self._deserialize = deserialize
 
     async def __call__(self, url, params):
@@ -79,8 +66,8 @@ class ProxyJSONAIO(Proxy):
         return json.load(decode_data(resp_data))
 
 
-class ProxyHTTPAIO(Proxy):
-    """The :class:`ProxyHTTPAIO` class provides a dynamic access
+class ProxyHTTP(Proxy):
+    """The :class:`ProxyHTTP` class provides a dynamic access
     to all HTTP methods.
     """
     async def __call__(self, url, data=None, headers=None):
@@ -93,7 +80,7 @@ class ProxyHTTPAIO(Proxy):
 
 class URLBuilder(object):
     """Auto-builds an URL while getting its attributes.
-    Used by the :class:`ProxyJSONAIO` and :class:`ProxyHTTPAIO` classes.
+    Used by the :class:`ProxyJSON` and :class:`ProxyHTTP` classes.
     """
     def __init__(self, rpc, url=None):
         self._rpc = rpc

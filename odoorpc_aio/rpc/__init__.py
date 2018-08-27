@@ -8,43 +8,33 @@ These methods can be accessed from the connectors of this module.
 """
 import aiohttp
 
-from odoorpc.rpc import Connector
+from odoorpc.rpc import Connector as SynchronousConnector
 
 from . import jsonrpclib
 
 
-async def ConnectorJSONRPC(
-        host, port=8069, timeout=120, version=None,
-        deserialize=True, client_session=None):
-    cnt = ConnectorJSONRPCAIO(
-        host, port, timeout, version, deserialize)
-    await cnt._init(client_session)
-    return cnt
+class Connector(SynchronousConnector):
+    async def __aenter__(self):
+       await self._client_session.__aenter__()
+
+    async def __aexit__(self, exc_type, exc, tb):
+       await self._client_session.__aexit__(exc_type, exc, tb)
 
 
-async def ConnectorJSONRPCSSL(
-        host, port=8069, timeout=120, version=None,
-        deserialize=True, client_session=None):
-    cnt = ConnectorJSONRPCSSLAIO(
-        host, port, timeout, version, deserialize)
-    await cnt._init(client_session)
-    return cnt
-
-
-class ConnectorJSONRPCAIO(Connector):
+class ConnectorJSONRPC(Connector):
     """Connector class using the `JSON-RPC` protocol.
 
     .. doctest::
         :options: +SKIP
 
         >>> from odoorpc_aio import rpc
-        >>> cnt = await rpc.ConnectorJSONRPC('localhost', port=8069)
+        >>> cnt = rpc.ConnectorJSONRPC('localhost', port=8069)
 
     .. doctest::
         :hide:
 
         >>> from odoorpc_aio import rpc
-        >>> cnt = await rpc.ConnectorJSONRPC(HOST, port=PORT)
+        >>> cnt = rpc.ConnectorJSONRPC(HOST, port=PORT)
 
     Open a user session:
 
@@ -148,36 +138,35 @@ class ConnectorJSONRPCAIO(Connector):
         True
     """
     def __init__(self, host, port=8069, timeout=120, version=None,
-                       deserialize=True):
-        super(ConnectorJSONRPCAIO, self).__init__(host, port, timeout, version)
+                       deserialize=True, client_session=None):
+        super(ConnectorJSONRPC, self).__init__(host, port, timeout, version)
         self.deserialize = deserialize
-
-    async def _init(self, client_session):
-        # One client session (with cookies handling) shared between
-        # JSON and HTTP requests
         if client_session is None:
             client_session = aiohttp.ClientSession()
         self._client_session = client_session
-        self._proxy_json, self._proxy_http = await self._get_proxies()
+        self._proxy_json, self._proxy_http = self._get_proxies()
 
-    async def _get_proxies(self):
+    def _get_proxies(self):
         """Returns the :class:`ProxyJSON <odoorpc_aio.rpc.jsonrpclib.ProxyJSON>`
         and :class:`ProxyHTTP <odoorpc_aio.rpc.jsonrpclib.ProxyHTTP>` instances
         corresponding to the server version used.
         """
-        proxy_json = await jsonrpclib.ProxyJSON(
+        proxy_json = jsonrpclib.ProxyJSON(
             self.host, self.port, self._timeout,
             ssl=self.ssl, deserialize=self.deserialize,
             client_session=self._client_session)
-        proxy_http = await jsonrpclib.ProxyHTTP(
+        proxy_http = jsonrpclib.ProxyHTTP(
             self.host, self.port, self._timeout,
             ssl=self.ssl, client_session=self._client_session)
-        # Detect the server version
+        return proxy_json, proxy_http
+
+    async def detect_version(self):
+        """Detect and store the server version."""
+        # TODO run this during the first async request
         if self.version is None:
-            result = await proxy_json.web.webclient.version_info()
+            result = await self._proxy_json.web.webclient.version_info()
             if 'server_version' in result['result']:
                 self.version = result['result']['server_version']
-        return proxy_json, proxy_http
 
     @property
     def proxy_json(self):
@@ -201,21 +190,21 @@ class ConnectorJSONRPCAIO(Connector):
         self._proxy_http._timeout = timeout
 
 
-class ConnectorJSONRPCSSLAIO(ConnectorJSONRPCAIO):
+class ConnectorJSONRPCSSL(ConnectorJSONRPC):
     """Connector class using the `JSON-RPC` protocol over `SSL`.
 
     .. doctest::
         :options: +SKIP
 
         >>> from odoorpc import rpc
-        >>> cnt = await rpc.ConnectorJSONRPCSSL('localhost', port=8069)
+        >>> cnt = rpc.ConnectorJSONRPCSSL('localhost', port=8069)
 
     .. doctest::
         :hide:
 
         >>> if 'ssl' in PROTOCOL:
         ...     from odoorpc import rpc
-        ...     cnt = await rpc.ConnectorJSONRPCSSL(HOST, port=PORT)
+        ...     cnt = rpc.ConnectorJSONRPCSSL(HOST, port=PORT)
     """
 
     @property
