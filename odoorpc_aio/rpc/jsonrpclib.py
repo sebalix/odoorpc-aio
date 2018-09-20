@@ -7,6 +7,8 @@ import io
 
 import aiohttp
 
+from odoorpc.rpc.jsonrpclib import URLBuilder
+
 
 def encode_data(data):
     try:
@@ -76,29 +78,3 @@ class ProxyHTTP(Proxy):
         return await self._client_session.post(
             full_url, data=encoded_data,
             headers=headers, timeout=self._timeout)
-
-
-class URLBuilder(object):
-    """Auto-builds an URL while getting its attributes.
-    Used by the :class:`ProxyJSON` and :class:`ProxyHTTP` classes.
-    """
-    def __init__(self, rpc, url=None):
-        self._rpc = rpc
-        self._url = url
-
-    def __getattr__(self, path):
-        new_url = self._url and '/'.join([self._url, path]) or path
-        return URLBuilder(self._rpc, new_url)
-
-    def __getitem__(self, path):
-        if path and path[0] == '/':
-            path = path[1:]
-        if path and path[-1] == '/':
-            path = path[:-1]
-        return getattr(self, path)
-
-    def __call__(self, **kwargs):
-        return self._rpc(self._url, kwargs)
-
-    def __str__(self):
-        return self._url
