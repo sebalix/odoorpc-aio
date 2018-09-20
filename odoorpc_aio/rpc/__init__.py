@@ -30,11 +30,21 @@ class ConnectorJSONRPC(Connector):
         >>> from odoorpc_aio import rpc
         >>> cnt = rpc.ConnectorJSONRPC('localhost', port=8069)
 
+    Or:
+
+    .. doctest::
+        :options: +SKIP
+
+        >>> async with rpc.ConnectorJSONRPC('localhost', port=8069) as cnt:
+        ...     pass
+
     .. doctest::
         :hide:
 
         >>> from odoorpc_aio import rpc
         >>> cnt = rpc.ConnectorJSONRPC(HOST, port=PORT)
+        >>> async with rpc.ConnectorJSONRPC(HOST, port=PORT) as cnt:
+        ...     pass
 
     Open a user session:
 
@@ -199,12 +209,22 @@ class ConnectorJSONRPCSSL(ConnectorJSONRPC):
         >>> from odoorpc import rpc
         >>> cnt = rpc.ConnectorJSONRPCSSL('localhost', port=8069)
 
+    Or:
+
+    .. doctest::
+        :options: +SKIP
+
+        >>> async with rpc.ConnectorJSONRPCSSL('localhost', port=8069) as cnt:
+        ...     pass
+
     .. doctest::
         :hide:
 
         >>> if 'ssl' in PROTOCOL:
         ...     from odoorpc import rpc
         ...     cnt = rpc.ConnectorJSONRPCSSL(HOST, port=PORT)
+        >>>     async with rpc.ConnectorJSONRPCSSL(HOST, port=PORT) as cnt:
+        ...         pass
     """
 
     @property
