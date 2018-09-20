@@ -2,19 +2,19 @@
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
 """Provides the :class:`ProxyJSON` class for JSON-RPC requests."""
 import json
+import logging
 import random
 import io
 
 import aiohttp
 
-from odoorpc.rpc.jsonrpclib import URLBuilder
+from odoorpc.rpc.jsonrpclib import (
+    encode_data, get_json_log_data, URLBuilder,
+    LOG_HIDDEN_JSON_PARAMS,
+    LOG_JSON_SEND_MSG, LOG_JSON_RECV_MSG,
+    LOG_HTTP_SEND_MSG, LOG_HTTP_RECV_MSG)
 
-
-def encode_data(data):
-    try:
-        return bytes(data, 'utf-8')
-    except:
-        return bytes(data)
+logger = logging.getLogger(__name__)
 
 
 def decode_data(data):
@@ -39,6 +39,9 @@ class Proxy(object):
     def __getitem__(self, url):
         return self._builder[url]
 
+    def _get_full_url(self, url):
+        return '/'.join([self._root_url, url])
+
 
 class ProxyJSON(Proxy):
     """The :class:`ProxyJSON` class provides a dynamic access
@@ -49,23 +52,34 @@ class ProxyJSON(Proxy):
         Proxy.__init__(self, host, port, timeout, ssl, client_session)
         self._deserialize = deserialize
 
-    async def __call__(self, url, params):
-        data = json.dumps({
+    async def __call__(self, url, params=None):
+        if params is None:
+            params = {}
+        data = {
             "jsonrpc": "2.0",
             "method": "call",
             "params": params,
             "id": random.randint(0, 1000000000),
-        })
+        }
         if url.startswith('/'):
             url = url[1:]
-        full_url = '/'.join([self._root_url, url])
+        full_url = self._get_full_url(url)
+        log_data = get_json_log_data(data)
+        logger.debug(
+            LOG_JSON_SEND_MSG,
+            {'url': full_url, 'data': log_data})
+        data_json = json.dumps(data)
         headers = {'Content-Type': 'application/json'}
         response = await self._client_session.post(
-            full_url, data=encode_data(data), headers=headers)
+            full_url, data=encode_data(data_json), headers=headers)
         resp_data = await response.read()
         if not self._deserialize:
             return resp_data
-        return json.load(decode_data(resp_data))
+        result = json.load(decode_data(resp_data))
+        logger.debug(
+            LOG_JSON_RECV_MSG,
+            {'url': full_url, 'data': log_data, 'result': result})
+        return result
 
 
 class ProxyHTTP(Proxy):
@@ -73,8 +87,19 @@ class ProxyHTTP(Proxy):
     to all HTTP methods.
     """
     async def __call__(self, url, data=None, headers=None):
-        full_url = '/'.join([self._root_url, url]),
+        if url.startswith('/'):
+            url = url[1:]
+        full_url = self._get_full_url(url)
+        logger.debug(
+            LOG_HTTP_SEND_MSG,
+            {'url': full_url, 'data': data and u" (%s)" % data or u""})
         encoded_data = encode_data(data) if data else None
-        return await self._client_session.post(
+        response = await self._client_session.post(
             full_url, data=encoded_data,
             headers=headers, timeout=self._timeout)
+        logger.debug(
+            LOG_HTTP_RECV_MSG,
+            {'url': full_url,
+             'data': data and u" (%s)" % data or u"",
+             'result': response})
+        return response

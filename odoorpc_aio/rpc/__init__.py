@@ -174,7 +174,7 @@ class ConnectorJSONRPC(Connector):
         """Detect and store the server version."""
         # TODO run this during the first async request
         if self.version is None:
-            result = await self._proxy_json.web.webclient.version_info()
+            result = await self._proxy_json('/web/webclient/version_info')
             if 'server_version' in result['result']:
                 self.version = result['result']['server_version']
 

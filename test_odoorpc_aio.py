@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import asyncio
+import logging
 import os
 
 import aiohttp
@@ -10,6 +11,10 @@ PORT = os.environ.get('PORT', 8069)
 DB = os.environ.get('DB', 'odoo')
 LOGIN = os.environ.get('LOGIN', 'admin')
 PASSWORD = os.environ.get('PASSWORD', 'admin')
+
+
+logging.basicConfig()
+logging.getLogger('odoorpc_aio').setLevel(logging.DEBUG)
 
 
 async def test_cnt():
